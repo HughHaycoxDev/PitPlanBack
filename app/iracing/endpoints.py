@@ -5,7 +5,7 @@ from app.config import settings
 SERIES_URL = "https://members-ng.iracing.com/data/series/seasons"
 SCHEDULE_URL = "https://members-ng.iracing.com/data/series/schedule"
 EVENTS_URL = "https://members-ng.iracing.com/data/special_events/list"
-
+TEAMS_URL = "https://members-ng.iracing.com/data/team/membership"
 
 async def cached_call(key: str, url: str, token: str, ttl_hours=24*7):
     cached = get_cache(key)
@@ -28,3 +28,7 @@ async def get_schedule(season_id: int, token: str):
 
 async def get_special_events(token: str):
     return await cached_call("special_events", EVENTS_URL, token)
+
+
+async def get_teams(token: str):
+    return await cached_call("teams", TEAMS_URL, token)
