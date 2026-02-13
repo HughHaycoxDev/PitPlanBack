@@ -32,19 +32,19 @@ async def series(request: Request):
 @router.get("/series/{season_id}/schedule")
 async def schedule(season_id: int, request: Request):
     user_id = extract_user_id(request)
-    iracing_token = get_iracing_token_for_user(user_id)
+    iracing_token = await get_iracing_token_for_user(user_id)
     return await get_schedule(season_id, iracing_token)
 
 
 @router.get("/events/special")
 async def special(request: Request):
     user_id = extract_user_id(request)
-    iracing_token = get_iracing_token_for_user(user_id)
+    iracing_token = await get_iracing_token_for_user(user_id)
     return await get_special_events(iracing_token)
 
 
 @router.get("/teams")
 async def teams(request: Request):
     user_id = extract_user_id(request)
-    iracing_token = get_iracing_token_for_user(user_id)
+    iracing_token = await get_iracing_token_for_user(user_id)
     return await get_teams(iracing_token)
