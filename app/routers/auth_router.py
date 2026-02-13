@@ -68,4 +68,4 @@ async def auth_callback(code: str = None, state: str = None):
                            algorithm=settings.ALGORITHM)
 
     # Redirect to frontend with JWT
-    return RedirectResponse(f"http://127.0.0.1:3000/?token={jwt_token}")
+    return RedirectResponse(f"http://localhost:4200/auth/callback?token={jwt_token}")
