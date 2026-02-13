@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Request, HTTPException
-from app.iracing.endpoints import get_series, get_schedule, get_special_events
+from app.iracing.endpoints import get_series, get_schedule, get_special_events, get_teams
 from jose import jwt, JWTError
 from app.config import settings
 from app.db.queries import get_iracing_token_for_user
@@ -41,3 +41,10 @@ async def special(request: Request):
     user_id = extract_user_id(request)
     iracing_token = get_iracing_token_for_user(user_id)
     return await get_special_events(iracing_token)
+
+
+@router.get("/teams")
+async def teams(request: Request):
+    user_id = extract_user_id(request)
+    iracing_token = get_iracing_token_for_user(user_id)
+    return await get_teams(iracing_token)
