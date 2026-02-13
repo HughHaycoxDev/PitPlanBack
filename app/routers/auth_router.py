@@ -60,7 +60,7 @@ async def auth_callback(code: str = None, state: str = None):
     payload = {
         "sub": display_name,
         "user_id": user_id,
-        "exp": datetime.utcnow() + timedelta(hours=1)
+        "exp": datetime.utcnow() + timedelta(hours=24)
     }
 
     # Generate internal JWT
