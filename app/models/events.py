@@ -75,3 +75,53 @@ class EventResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+# ===== TEAM AND REGISTRATION MODELS =====
+
+class TeamBase(BaseModel):
+    team_id: int
+    team_name: str
+    owner: bool
+    admin: bool
+    team_logo: str = None
+
+
+class TeamDB(TeamBase):
+    id: int
+
+
+class EventRegistrationCreate(BaseModel):
+    """Model for creating an event registration"""
+    event_id: int
+    user_id: int
+    team_id: int
+    time_slot: datetime
+    car_id: int
+
+
+class EventRegistrationResponse(BaseModel):
+    """Model for returning registration details"""
+    id: int
+    event_id: int
+    user_id: int
+    team_id: int
+    time_slot: datetime
+    car_id: int
+    registered_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class EventRegistrationDetail(BaseModel):
+    """Model with full event and team details"""
+    id: int
+    event: EventResponse
+    user_id: int
+    team: TeamDB
+    time_slot: TimeSlot
+    car: CarDB
+    registered_at: datetime
+
+    class Config:
+        from_attributes = True

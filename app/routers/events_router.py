@@ -1,15 +1,21 @@
 """
-Routes for managing Events, Cars, and Tracks
+Routes for managing Events, Cars, Tracks, Teams, and Registrations
 """
 from fastapi import APIRouter, HTTPException, Request
 from typing import List
 
 from app.models.events import (
-    EventCreate, EventUpdate, EventResponse, CarDB, TrackDB
+    EventCreate, EventUpdate, EventResponse, CarDB, TrackDB,
+    EventRegistrationCreate, EventRegistrationResponse, EventRegistrationDetail,
+    TeamDB
 )
 from app.db.events_queries import (
     create_event, get_event_by_id, get_all_events, update_event, delete_event,
-    get_all_cars, get_car_by_id, get_all_tracks, get_track_by_id, init_events_db
+    get_all_cars, get_car_by_id, get_all_tracks, get_track_by_id, init_events_db,
+    upsert_teams, get_all_teams, get_team_by_id, get_team_by_team_id,
+    register_for_event, get_registration_by_id, get_registrations_for_user,
+    get_registrations_for_event, get_registrations_for_event_and_team,
+    cancel_registration, cancel_user_event_registration
 )
 from app.iracing.sync import sync_all_iracing_data, sync_cars_from_iracing, sync_tracks_from_iracing
 from app.db.queries import get_iracing_token_for_user
@@ -206,3 +212,113 @@ async def delete_existing_event(event_id: int, request: Request):
     
     delete_event(event_id)
     return {"message": "Event deleted successfully"}
+
+# ===== TEAMS ENDPOINTS =====
+
+@router.get("/teams", response_model=List[TeamDB])
+async def get_teams(request: Request):
+    """Get all teams"""
+    extract_user_id(request)  
+    return get_all_teams()
+
+
+@router.get("/teams/{team_id}", response_model=TeamDB)
+async def get_team(team_id: int, request: Request):
+    """Get a specific team by ID"""
+    extract_user_id(request)  
+    team = get_team_by_id(team_id)
+    if not team:
+        raise HTTPException(404, "Team not found")
+    return team
+
+
+# ===== EVENT REGISTRATION ENDPOINTS =====
+
+@router.post("/register", response_model=EventRegistrationResponse)
+async def register_user_for_event(registration: EventRegistrationCreate, request: Request):
+    """Register a user for an event with a team, timeslot, and car"""
+    user_id = extract_user_id(request)
+    
+    # Ensure the user is registering themselves
+    if registration.user_id != user_id:
+        raise HTTPException(403, "Cannot register another user")
+    
+    try:
+        result = register_for_event(registration)
+        return result
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"Registration failed: {str(e)}")
+
+
+@router.get("/registrations/user", response_model=List[EventRegistrationDetail])
+async def get_user_registrations(request: Request):
+    """Get all event registrations for the current user"""
+    user_id = extract_user_id(request)
+    return get_registrations_for_user(user_id)
+
+
+@router.get("/registrations/event/{event_id}", response_model=List[EventRegistrationDetail])
+async def get_event_registrations(event_id: int, request: Request):
+    """Get all registrations for a specific event"""
+    extract_user_id(request)  
+    
+    # Verify event exists
+    event = get_event_by_id(event_id)
+    if not event:
+        raise HTTPException(404, "Event not found")
+    
+    return get_registrations_for_event(event_id)
+
+
+@router.get("/registrations/event/{event_id}/team/{team_id}", response_model=List[EventRegistrationDetail])
+async def get_event_team_registrations(event_id: int, team_id: int, request: Request):
+    """Get all registrations for a specific event and team"""
+    extract_user_id(request)  
+    
+    # Verify event and team exist
+    event = get_event_by_id(event_id)
+    if not event:
+        raise HTTPException(404, "Event not found")
+    
+    team = get_team_by_id(team_id)
+    if not team:
+        raise HTTPException(404, "Team not found")
+    
+    return get_registrations_for_event_and_team(event_id, team_id)
+
+
+@router.delete("/registrations/{registration_id}")
+async def cancel_user_registration(registration_id: int, request: Request):
+    """Cancel a specific registration"""
+    user_id = extract_user_id(request)
+    
+    # Get registration to verify ownership
+    registration = get_registration_by_id(registration_id)
+    if not registration:
+        raise HTTPException(404, "Registration not found")
+    
+    if registration.user_id != user_id:
+        raise HTTPException(403, "Cannot cancel another user's registration")
+    
+    if cancel_registration(registration_id):
+        return {"message": "Registration cancelled successfully"}
+    else:
+        raise HTTPException(500, "Failed to cancel registration")
+
+
+@router.delete("/registrations/event/{event_id}")
+async def cancel_event_registration(event_id: int, request: Request):
+    """Cancel a user's registration for a specific event"""
+    user_id = extract_user_id(request)
+    
+    # Verify event exists
+    event = get_event_by_id(event_id)
+    if not event:
+        raise HTTPException(404, "Event not found")
+    
+    if cancel_user_event_registration(user_id, event_id):
+        return {"message": "Event registration cancelled successfully"}
+    else:
+        raise HTTPException(500, "Failed to cancel event registration")

@@ -1,12 +1,16 @@
 """
-Database queries for Events, Tracks, and Cars
+Database queries for Events, Tracks, Cars, Teams, and Registrations
 """
 import sqlite3
 import json
 from datetime import datetime, date
 from typing import List, Optional
 from app.cache.db import get_db
-from app.models.events import EventCreate, EventUpdate, EventResponse, TrackDB, CarDB, TimeSlot
+from app.models.events import (
+    EventCreate, EventUpdate, EventResponse, TrackDB, CarDB, TimeSlot,
+    EventRegistrationCreate, EventRegistrationResponse, EventRegistrationDetail,
+    TeamBase, TeamDB
+)
 
 
 def init_events_db():
@@ -76,6 +80,39 @@ def init_events_db():
         car_id INTEGER NOT NULL,
         PRIMARY KEY (event_id, car_id),
         FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+        FOREIGN KEY (car_id) REFERENCES cars(id) ON DELETE CASCADE
+    )
+    """)
+    
+    # Teams table
+    db.execute("""
+    CREATE TABLE IF NOT EXISTS teams (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        team_id INTEGER UNIQUE NOT NULL,
+        team_name TEXT NOT NULL,
+        owner INTEGER NOT NULL,
+        admin INTEGER NOT NULL,
+        team_logo TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    
+    # Event registrations table - stores user registrations for events
+    db.execute("""
+    CREATE TABLE IF NOT EXISTS event_registrations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        team_id INTEGER NOT NULL,
+        time_slot DATETIME NOT NULL,
+        car_id INTEGER NOT NULL,
+        registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (event_id, user_id, team_id),
+        FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+        FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
+        FOREIGN KEY (time_slot) REFERENCES event_time_slots(slot_time) ON DELETE CASCADE,
         FOREIGN KEY (car_id) REFERENCES cars(id) ON DELETE CASCADE
     )
     """)
@@ -465,4 +502,273 @@ def delete_event(event_id: int) -> bool:
     db.execute("DELETE FROM events WHERE id = ?", (event_id,))
     
     db.commit()
+    return True
+
+# ===== TEAM QUERIES =====
+
+def upsert_teams(teams_data: List[dict]) -> None:
+    """Insert or update multiple teams from iRacing API data"""
+    db = get_db()
+    
+    for team in teams_data:
+        db.execute("""
+        INSERT INTO teams (team_id, team_name, owner, admin, team_logo, updated_at)
+        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(team_id) DO UPDATE SET
+            team_name = excluded.team_name,
+            owner = excluded.owner,
+            admin = excluded.admin,
+            team_logo = excluded.team_logo,
+            updated_at = CURRENT_TIMESTAMP
+        """, (
+            team.get('team_id'),
+            team.get('team_name'),
+            team.get('owner'),
+            team.get('admin'),
+            team.get('team_logo')
+        ))
+    
+    db.commit()
+
+
+def get_all_teams() -> List[TeamDB]:
+    """Get all teams from database"""
+    db = get_db()
+    rows = db.execute("SELECT id, team_id, team_name, team_logo FROM teams ORDER BY team_name").fetchall()
+    return [TeamDB(
+        id=row[0],
+        team_id=row[1],
+        team_name=row[2],
+        team_logo=row[3]
+    ) for row in rows]
+
+
+def get_team_by_id(team_id: int) -> Optional[TeamDB]:
+    """Get a single team by ID"""
+    db = get_db()
+    row = db.execute("SELECT id, team_id, team_name, team_logo FROM teams WHERE id = ?", (team_id,)).fetchone()
+    if not row:
+        return None
+    return TeamDB(
+        id=row[0],
+        team_id=row[1],
+        team_name=row[2],
+        team_logo=row[3]
+    )
+
+
+def get_team_by_team_id(team_id: int) -> Optional[TeamDB]:
+    """Get a single team by iRacing team_id"""
+    db = get_db()
+    row = db.execute("SELECT id, team_id, team_name, team_logo FROM teams WHERE team_id = ?", (team_id,)).fetchone()
+    if not row:
+        return None
+    return TeamDB(
+        id=row[0],
+        team_id=row[1],
+        team_name=row[2],
+        team_logo=row[3]
+    )
+
+
+# ===== EVENT REGISTRATION QUERIES =====
+
+def register_for_event(registration_data: EventRegistrationCreate) -> EventRegistrationResponse:
+    """Register a user for an event with a team, timeslot, and car"""
+    db = get_db()
+    
+    # Verify all relationships exist
+    event_row = db.execute("SELECT id FROM events WHERE id = ?", (registration_data.event_id,)).fetchone()
+    if not event_row:
+        raise ValueError(f"Event {registration_data.event_id} not found")
+    
+    user_row = db.execute("SELECT user_id FROM users WHERE user_id = ?", (registration_data.user_id,)).fetchone()
+    if not user_row:
+        raise ValueError(f"User {registration_data.user_id} not found")
+    
+    team_row = db.execute("SELECT id FROM teams WHERE team_id = ?", (registration_data.team_id,)).fetchone()
+    if not team_row:
+        raise ValueError(f"Team {registration_data.team_id} not found")
+    
+    timeslot_row = db.execute("SELECT slot_time FROM event_time_slots WHERE slot_time = ? AND event_id = ?", 
+                              (registration_data.time_slot, registration_data.event_id)).fetchone()
+    if not timeslot_row:
+        raise ValueError(f"Time slot {registration_data.time_slot} not found for event {registration_data.event_id}")
+    
+    car_row = db.execute("SELECT id FROM cars WHERE id = ?", (registration_data.car_id,)).fetchone()
+    if not car_row:
+        raise ValueError(f"Car {registration_data.car_id} not found")
+    
+    # Verify car is available for this event
+    car_event_row = db.execute("SELECT 1 FROM event_cars WHERE event_id = ? AND car_id = ?",
+                               (registration_data.event_id, registration_data.car_id)).fetchone()
+    if not car_event_row:
+        raise ValueError(f"Car {registration_data.car_id} is not available for event {registration_data.event_id}")
+    
+    # Insert registration
+    cursor = db.execute("""
+        INSERT INTO event_registrations (event_id, user_id, team_id, time_slot, car_id)
+        VALUES (?, ?, ?, ?, ?)
+    """, (
+        registration_data.event_id,
+        registration_data.user_id,
+        registration_data.team_id,
+        registration_data.time_slot,
+        registration_data.car_id
+    ))
+    
+    db.commit()
+    registration_id = cursor.lastrowid
+    
+    return get_registration_by_id(registration_id)
+
+
+def get_registration_by_id(registration_id: int) -> Optional[EventRegistrationResponse]:
+    """Get a single registration by ID"""
+    db = get_db()
+    row = db.execute("""
+        SELECT id, event_id, user_id, team_id, time_slot, car_id, registered_at
+        FROM event_registrations WHERE id = ?
+    """, (registration_id,)).fetchone()
+    
+    if not row:
+        return None
+    
+    return EventRegistrationResponse(
+        id=row[0],
+        event_id=row[1],
+        user_id=row[2],
+        team_id=row[3],
+        time_slot=row[4],
+        car_id=row[5],
+        registered_at=datetime.fromisoformat(row[6])
+    )
+
+
+def get_registrations_for_user(user_id: int) -> List[EventRegistrationDetail]:
+    """Get all event registrations for a specific user"""
+    db = get_db()
+    
+    registrations = []
+    rows = db.execute("""
+        SELECT er.id, er.event_id, er.user_id, er.team_id, er.time_slot_id, er.car_id, er.registered_at
+        FROM event_registrations er
+        WHERE er.user_id = ?
+        ORDER BY er.registered_at DESC
+    """, (user_id,)).fetchall()
+    
+    for row in rows:
+        event = get_event_by_id(row[1])
+        team = get_team_by_id(row[3])
+        
+        timeslot_row = db.execute("SELECT slot_time FROM event_time_slots WHERE event_id = ? AND slot_time = ?", (row[1], row[4])).fetchone()
+        time_slot = TimeSlot(slot_time=datetime.fromisoformat(timeslot_row[0])) if timeslot_row else None
+        
+        car = get_car_by_id(row[5])
+        
+        registrations.append(EventRegistrationDetail(
+            id=row[0],
+            event=event,
+            user_id=row[2],
+            team=team,
+            time_slot=time_slot,
+            car=car,
+            registered_at=datetime.fromisoformat(row[6])
+        ))
+    
+    return registrations
+
+
+def get_registrations_for_event(event_id: int) -> List[EventRegistrationDetail]:
+    """Get all registrations for a specific event"""
+    db = get_db()
+    
+    registrations = []
+    rows = db.execute("""
+        SELECT er.id, er.event_id, er.user_id, er.team_id, er.time_slot_id, er.car_id, er.registered_at
+        FROM event_registrations er
+        WHERE er.event_id = ?
+        ORDER BY er.registered_at DESC
+    """, (event_id,)).fetchall()
+    
+    for row in rows:
+        event = get_event_by_id(row[1])
+        team = get_team_by_id(row[3])
+        
+        timeslot_row = db.execute("SELECT slot_time FROM event_time_slots WHERE id = ?", (row[4],)).fetchone()
+        time_slot = TimeSlot(slot_time=datetime.fromisoformat(timeslot_row[0])) if timeslot_row else None
+        
+        car = get_car_by_id(row[5])
+        
+        registrations.append(EventRegistrationDetail(
+            id=row[0],
+            event=event,
+            user_id=row[2],
+            team=team,
+            time_slot=time_slot,
+            car=car,
+            registered_at=datetime.fromisoformat(row[6])
+        ))
+    
+    return registrations
+
+
+def get_registrations_for_event_and_team(event_id: int, team_id: int) -> List[EventRegistrationDetail]:
+    """Get all registrations for a specific event and team"""
+    db = get_db()
+    
+    registrations = []
+    rows = db.execute("""
+        SELECT er.id, er.event_id, er.user_id, er.team_id, er.time_slot_id, er.car_id, er.registered_at
+        FROM event_registrations er
+        WHERE er.event_id = ? AND er.team_id = ?
+        ORDER BY er.registered_at DESC
+    """, (event_id, team_id)).fetchall()
+    
+    for row in rows:
+        event = get_event_by_id(row[1])
+        team = get_team_by_id(row[3])
+        
+        timeslot_row = db.execute("SELECT slot_time FROM event_time_slots WHERE id = ?", (row[4],)).fetchone()
+        time_slot = TimeSlot(slot_time=datetime.fromisoformat(timeslot_row[0])) if timeslot_row else None
+        
+        car = get_car_by_id(row[5])
+        
+        registrations.append(EventRegistrationDetail(
+            id=row[0],
+            event=event,
+            user_id=row[2],
+            team=team,
+            time_slot=time_slot,
+            car=car,
+            registered_at=datetime.fromisoformat(row[6])
+        ))
+    
+    return registrations
+
+
+def cancel_registration(registration_id: int) -> bool:
+    """Cancel an event registration"""
+    db = get_db()
+    
+    # Check if registration exists
+    existing = db.execute("SELECT id FROM event_registrations WHERE id = ?", (registration_id,)).fetchone()
+    if not existing:
+        return False
+    
+    # Delete registration
+    db.execute("DELETE FROM event_registrations WHERE id = ?", (registration_id,))
+    db.commit()
+    
+    return True
+
+
+def cancel_user_event_registration(user_id: int, event_id: int) -> bool:
+    """Cancel a user's registration for a specific event"""
+    db = get_db()
+    
+    # Find and delete the registration
+    db.execute("DELETE FROM event_registrations WHERE user_id = ? AND event_id = ?", (user_id, event_id))
+    db.commit()
+    
     return True
