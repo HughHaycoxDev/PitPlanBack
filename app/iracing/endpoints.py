@@ -1,3 +1,4 @@
+from app.db.events_queries import upsert_teams
 from .client import iracing_get
 from app.cache.cache import get_cache, set_cache
 from app.config import settings
@@ -31,4 +32,22 @@ async def get_special_events(token: str):
 
 
 async def get_teams(token: str):
+    try:
+        teams_data = await cached_call("teams", TEAMS_URL, token)
+        processed_teams = []
+        if isinstance(teams_data, list):
+            for team in teams_data:
+                processed_teams.append({
+                    'team_id': team.get('team_id'),
+                    'team_name': team.get('team_name'),
+                    'owner': team.get('owner'),
+                    'admin': team.get('admin'),
+                })
+        if processed_teams:
+            upsert_teams(processed_teams)
+
+    except Exception as e:
+        print(f"Error syncing teams from iRacing API: {str(e)}")
+        raise
+
     return await cached_call("teams", TEAMS_URL, token)
