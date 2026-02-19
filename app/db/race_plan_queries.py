@@ -13,7 +13,9 @@ def init_race_plan_db():
     db.execute("""
     CREATE TABLE IF NOT EXISTS race_plans (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        team_id INTEGER NOT NULL
+        team_id INTEGER NOT NULL,
+        car_id INTEGER NOT NULL,
+        time_slot TEXT NOT NULL
     )
     """)
 
@@ -26,9 +28,9 @@ def create_race_plan(plan: RacePlan) -> RacePlan:
     db = get_db()
 
     db.execute("""
-    INSERT INTO race_plans (id, team_id)
-    VALUES (?, ?)
-    """, (None, plan.team_id))
+    INSERT INTO race_plans (id, team_id, car_id, time_slot)
+    VALUES (?, ?, ?, ?)
+    """, (None, plan.team_id, plan.car_id, plan.time_slot))
 
     db.commit()
     return plan

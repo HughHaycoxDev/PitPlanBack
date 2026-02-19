@@ -11,7 +11,7 @@ from app.db.race_plan_queries import (
 router = APIRouter(prefix="/race-plan", tags=["race-plan"])
 
 @router.post("/create", response_model=RacePlan)
-async def create_race_plan_endpoint(race_plan: RacePlan, request: Request):
+async def create_race_plan_endpoint(race_plan: RacePlan):
     """Create a new race plan"""
     
     try:
