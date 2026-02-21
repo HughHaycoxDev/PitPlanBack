@@ -116,8 +116,6 @@ def init_events_db():
         FOREIGN KEY (car_id) REFERENCES cars(id) ON DELETE CASCADE
     )
     """)
-
-    print(db)
     
     db.commit()
 
