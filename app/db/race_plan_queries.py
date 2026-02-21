@@ -5,6 +5,7 @@ from app.cache.db import get_db
 from app.models.race_plan import (
     RacePlan
 )
+from typing import List
 
 def init_race_plan_db():
     """Initialize the database with the necessary tables"""
@@ -19,8 +20,6 @@ def init_race_plan_db():
     )
     """)
 
-    print(db)
-
     db.commit()
 
 def create_race_plan(plan: RacePlan) -> RacePlan:
@@ -34,3 +33,10 @@ def create_race_plan(plan: RacePlan) -> RacePlan:
 
     db.commit()
     return plan
+
+def get_race_plans() -> List[RacePlan]:
+    """Get all race plans"""
+    db = get_db()
+
+    rows = db.execute("SELECT id, team_id, car_id, time_slot FROM race_plans").fetchall()
+    return [RacePlan(team_id=row[1], car_id=row[2], time_slot=row[3]) for row in rows]
