@@ -282,7 +282,7 @@ async def get_event_team_registrations(event_id: int, team_id: int, request: Req
     if not event:
         raise HTTPException(404, "Event not found")
     
-    team = get_team_by_id(team_id)
+    team = get_team_by_team_id(team_id)
     if not team:
         raise HTTPException(404, "Team not found")
     

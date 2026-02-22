@@ -6,6 +6,7 @@ import json
 from datetime import datetime, date
 from typing import List, Optional
 from app.cache.db import get_db
+from app.db.queries import get_display_name_from_user_id
 from app.models.events import (
     EventCreate, EventUpdate, EventResponse, TrackDB, CarDB, TimeSlot,
     EventRegistrationCreate, EventRegistrationResponse, EventRegistrationDetail,
@@ -560,14 +561,16 @@ def get_team_by_id(team_id: int) -> Optional[TeamDB]:
 def get_team_by_team_id(team_id: int) -> Optional[TeamDB]:
     """Get a single team by iRacing team_id"""
     db = get_db()
-    row = db.execute("SELECT id, team_id, team_name, team_logo FROM teams WHERE team_id = ?", (team_id,)).fetchone()
+    row = db.execute("SELECT id, team_id, team_name, owner, admin, team_logo FROM teams WHERE team_id = ?", (team_id,)).fetchone()
     if not row:
         return None
     return TeamDB(
         id=row[0],
         team_id=row[1],
         team_name=row[2],
-        team_logo=row[3]
+        owner=row[3],
+        admin=row[4],
+        team_logo=row[5]
     )
 
 
@@ -719,7 +722,7 @@ def get_registrations_for_event_and_team(event_id: int, team_id: int) -> List[Ev
     
     registrations = []
     rows = db.execute("""
-        SELECT er.id, er.event_id, er.user_id, er.team_id, er.time_slot_id, er.car_id, er.registered_at
+        SELECT er.id, er.event_id, er.user_id, er.team_id, er.time_slot, er.car_id, er.registered_at
         FROM event_registrations er
         WHERE er.event_id = ? AND er.team_id = ?
         ORDER BY er.registered_at DESC
@@ -727,17 +730,20 @@ def get_registrations_for_event_and_team(event_id: int, team_id: int) -> List[Ev
     
     for row in rows:
         event = get_event_by_id(row[1])
-        team = get_team_by_id(row[3])
+        team = get_team_by_team_id(row[3])
         
-        timeslot_row = db.execute("SELECT slot_time FROM event_time_slots WHERE id = ?", (row[4],)).fetchone()
-        time_slot = TimeSlot(slot_time=datetime.fromisoformat(timeslot_row[0])) if timeslot_row else None
+        print(row[4])
+        timeslot_row = row[4]
+        time_slot = TimeSlot(slot_time=datetime.fromisoformat(timeslot_row)) if timeslot_row else None
         
         car = get_car_by_id(row[5])
+
+        display_name = get_display_name_from_user_id(row[2])
         
         registrations.append(EventRegistrationDetail(
             id=row[0],
             event=event,
-            user_id=row[2],
+            display_name=display_name,
             team=team,
             time_slot=time_slot,
             car=car,
