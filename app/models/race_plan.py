@@ -9,3 +9,4 @@ class RacePlan(BaseModel):
     team_id: int
     car_id: int
     time_slot: datetime
+    event_id: int
