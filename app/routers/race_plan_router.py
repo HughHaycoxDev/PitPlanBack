@@ -3,7 +3,7 @@ Routes for managing Race Plan
 """
 from fastapi import APIRouter, HTTPException, Request
 
-from app.models.race_plan import (RacePlan)
+from app.models.race_plan import (RacePlanRequest, RacePlanResponse)
 from app.db.race_plan_queries import (
     create_race_plan,
     get_race_plan_by_team_and_event,
@@ -11,8 +11,8 @@ from app.db.race_plan_queries import (
 
 router = APIRouter(prefix="/race-plan", tags=["race-plan"])
 
-@router.post("/create", response_model=RacePlan)
-async def create_race_plan_endpoint(race_plan: RacePlan):
+@router.post("/create", response_model=RacePlanResponse)
+async def create_race_plan_endpoint(race_plan: RacePlanRequest):
     """Create a new race plan"""
     
     try:
@@ -23,7 +23,7 @@ async def create_race_plan_endpoint(race_plan: RacePlan):
     except Exception as e:
         raise HTTPException(500, f"Failed to create race plan: {str(e)}")
 
-@router.get("/list/team/{team_id}/event/{event_id}", response_model=RacePlan)
+@router.get("/list/team/{team_id}/event/{event_id}", response_model=RacePlanResponse)
 async def get_race_plan_by_team_and_event_endpoint(team_id: int, event_id: int):
     """Get one race plan for a specific team and event"""
 
