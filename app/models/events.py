@@ -2,7 +2,7 @@
 Database models for Events, Cars, Tracks, and their relationships.
 """
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 from datetime import datetime, date
 
 
@@ -83,11 +83,12 @@ class TeamBase(BaseModel):
     team_name: str
     owner: bool
     admin: bool
-    team_logo: str = None
+    team_logo: Optional[str] = None
 
 
 class TeamDB(TeamBase):
     id: int
+    
 
 
 class EventRegistrationCreate(BaseModel):
@@ -117,7 +118,7 @@ class EventRegistrationDetail(BaseModel):
     """Model with full event and team details"""
     id: int
     event: EventResponse
-    user_id: int
+    display_name: str
     team: TeamDB
     time_slot: TimeSlot
     car: CarDB

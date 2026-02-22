@@ -48,3 +48,14 @@ async def get_iracing_token_for_user(user_id: int) -> str:
     db.commit()
 
     return new_access
+
+def get_display_name_from_user_id(user_id: int) -> str:
+    db = get_db()
+
+    row = db.execute("""
+        SELECT display_name FROM users WHERE user_id = ?
+    """, (user_id,)).fetchone()
+
+    if not row:
+        return None
+    return row[0]
