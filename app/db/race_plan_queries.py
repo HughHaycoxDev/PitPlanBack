@@ -39,7 +39,7 @@ def create_race_plan(plan: RacePlan) -> RacePlan:
     db.commit()
     return plan
 
-def get_race_plan(team_id: int, event_id: int) -> RacePlan:
+def get_race_plan_by_team_and_event(team_id: int, event_id: int) -> RacePlan:
     db = get_db()
 
     row = db.execute("""
