@@ -3,9 +3,9 @@ Database queries for Race Plan
 """
 from app.cache.db import get_db
 from app.models.race_plan import (
-    RacePlan
+    RacePlanResponse,
+    RacePlanRequest
 )
-from typing import List
 
 def init_race_plan_db():
     """Initialize the database with the necessary tables"""
@@ -27,7 +27,7 @@ def init_race_plan_db():
 
     db.commit()
 
-def create_race_plan(plan: RacePlan) -> RacePlan:
+def create_race_plan(plan: RacePlanRequest) -> RacePlanResponse:
     """Create a new race plan"""
     db = get_db()
 
@@ -37,13 +37,19 @@ def create_race_plan(plan: RacePlan) -> RacePlan:
     """, (None, plan.team_id, plan.car_id, plan.time_slot, plan.event_id))
 
     db.commit()
-    return plan
+    return RacePlanResponse(
+        id=db.execute("SELECT last_insert_rowid()").fetchone()[0],
+        team_id=plan.team_id,
+        car_id=plan.car_id,
+        event_id=plan.event_id,
+        time_slot=plan.time_slot
+    )
 
-def get_race_plan_by_team_and_event(team_id: int, event_id: int) -> RacePlan:
+def get_race_plan_by_team_and_event(team_id: int, event_id: int) -> RacePlanResponse:
     db = get_db()
 
     row = db.execute("""
-        SELECT team_id, car_id, event_id, time_slot
+        SELECT id, team_id, car_id, event_id, time_slot
         FROM race_plans
         WHERE team_id=? AND event_id=?
     """, (team_id, event_id)).fetchone()
@@ -51,9 +57,10 @@ def get_race_plan_by_team_and_event(team_id: int, event_id: int) -> RacePlan:
     if not row:
         raise ValueError("Race plan not found")
 
-    return RacePlan(
-        team_id=row[0],
-        car_id=row[1],
-        event_id=row[2],
-        time_slot=row[3]
+    return RacePlanResponse(
+        id=row[0],
+        team_id=row[1],
+        car_id=row[2],
+        event_id=row[3],
+        time_slot=row[4]
     )
