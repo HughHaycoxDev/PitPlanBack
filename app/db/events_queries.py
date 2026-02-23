@@ -757,7 +757,7 @@ def get_event_registration_for_event_and_team(event_id: int, team_id: int) -> Li
     db = get_db()
     
     rows = db.execute("""
-        SELECT id, event_id, user_id, team_id, time_slot_id, car_id
+        SELECT id, event_id, user_id, team_id, time_slot, car_id
         FROM event_registrations
         WHERE event_id = ? AND team_id = ?
     """, (event_id, team_id)).fetchall()
