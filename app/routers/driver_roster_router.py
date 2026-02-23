@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from app.models.driver_roster import (DriverRoster)
 from app.db.driver_roster_queries import (
+    create_driver_roster_entry,
     delete_driver_roster_entry,
     list_driver_roster_by_race_plan,
     update_driver_roster_entry,
@@ -23,6 +24,18 @@ async def list_driver_roster_by_race_plan_endpoint(race_plan_id: int):
         raise HTTPException(400, str(e))
     except Exception as e:
         raise HTTPException(500, f"Failed to list driver roster: {str(e)}")
+    
+@router.post("/create/driver/{race_plan_id}")
+async def create_driver_roster_entry_endpoint(race_plan_id: int):
+    """Create a new driver roster entry"""
+    
+    try:
+        result = create_driver_roster_entry(race_plan_id=race_plan_id)
+        return result
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"Failed to create driver roster: {str(e)}")
     
 @router.put("/update/driver", response_model=DriverRoster)
 async def update_driver_roster_by_race_plan_endpoint(driver_roster: DriverRoster):

@@ -62,6 +62,17 @@ def list_driver_roster_by_race_plan(race_plan_id: int) -> List[DriverRoster]:
         for row in rows
     ]
 
+def create_driver_roster_entry(race_plan_id: int):
+    """Create a driver roster entry"""
+
+    db = get_db()
+    db.execute("""
+    INSERT INTO driver_rosters (id, color, name, stints, fair_share, gmt_offset, i_rating, lap_time, factor, preference, race_plan_id, user_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (None, None, None, None, None, None, None, None, None, None, race_plan_id, None))
+
+    db.commit()
+
 def update_driver_roster_entry(driver_roster: DriverRoster) -> DriverRoster:
     """Update a driver roster entry"""
     db = get_db()
