@@ -21,3 +21,4 @@ async def list_driver_roster_by_race_plan_endpoint(race_plan_id: int):
         raise HTTPException(400, str(e))
     except Exception as e:
         raise HTTPException(500, f"Failed to list driver roster: {str(e)}")
+    

@@ -752,6 +752,29 @@ def get_registrations_for_event_and_team(event_id: int, team_id: int) -> List[Ev
     
     return registrations
 
+def get_event_registration_for_event_and_team(event_id: int, team_id: int) -> List[EventRegistrationCreate]:
+    """Get event registration for a specific event and team"""
+    db = get_db()
+    
+    rows = db.execute("""
+        SELECT id, event_id, user_id, team_id, time_slot_id, car_id
+        FROM event_registrations
+        WHERE event_id = ? AND team_id = ?
+    """, (event_id, team_id)).fetchall()
+    
+    registrations = []
+    for row in rows:
+        registrations.append(EventRegistrationCreate(
+            id=row[0],
+            event_id=row[1],
+            user_id=row[2],
+            team_id=row[3],
+            time_slot=row[4],
+            car_id=row[5]
+        ))
+    
+    return registrations
+
 
 def cancel_registration(registration_id: int) -> bool:
     """Cancel an event registration"""
