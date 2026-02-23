@@ -9,7 +9,7 @@ class DriverRoster(BaseModel):
     """Model for a driver roster entry"""
     id: int | None = None
     color: Optional[str] = None
-    name: str
+    name: Optional[str] = None
     stints: Optional[int] = None
     fair_share: Optional[bool] = None
     gmt_offset: Optional[int] = None
