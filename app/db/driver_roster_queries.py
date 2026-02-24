@@ -87,9 +87,17 @@ def update_driver_roster_entry(driver_roster: DriverRoster) -> DriverRoster:
 
     return driver_roster
 
-def delete_driver_roster_entry(driver_id: int):
-    """Delete a driver roster entry"""
+def delete_driver_roster_entry(driver_id: int) -> int | None:
+    """Delete a driver roster entry and return the race_plan_id"""
     db = get_db()
+
+    # First get the race_plan_id before deleting
+    row = db.execute("""
+        SELECT race_plan_id FROM driver_rosters
+        WHERE id = ?
+    """, (driver_id,)).fetchone()
+    
+    race_plan_id = row[0] if row else None
 
     db.execute("""
         DELETE FROM driver_rosters
@@ -97,6 +105,8 @@ def delete_driver_roster_entry(driver_id: int):
     """, (driver_id,))
 
     db.commit()
+    
+    return race_plan_id
 
 def create_driver_roster_entry_from_event_registration(display_name: str, race_plan_id: int, user_id: int | None = None):
     """Create a driver roster entry from an event registration"""
@@ -108,3 +118,32 @@ def create_driver_roster_entry_from_event_registration(display_name: str, race_p
     """, (None, None, display_name, None, None, None, None, None, None, None, race_plan_id, user_id))
 
     db.commit()
+
+
+def create_driver_roster_entry(driver_roster: DriverRoster) -> DriverRoster:
+    """Create a new driver roster entry"""
+    db = get_db()
+
+    cursor = db.execute("""
+        INSERT INTO driver_rosters (color, name, stints, fair_share, gmt_offset, i_rating, lap_time, factor, preference, race_plan_id, user_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        driver_roster.color,
+        driver_roster.name,
+        driver_roster.stints,
+        driver_roster.fair_share,
+        driver_roster.gmt_offset,
+        driver_roster.i_rating,
+        driver_roster.lap_time,
+        driver_roster.factor,
+        driver_roster.preference,
+        driver_roster.race_plan_id,
+        driver_roster.user_id
+    ))
+
+    db.commit()
+    
+    # Set the ID of the newly created entry
+    driver_roster.id = cursor.lastrowid
+    
+    return driver_roster

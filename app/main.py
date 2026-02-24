@@ -10,6 +10,7 @@ from app.routers.iracing_router import router as iracing_router
 from app.routers.events_router import router as events_router
 from app.routers.race_plan_router import router as race_plan_router
 from app.routers.driver_roster_router import router as driver_roster_router
+from app.routers.websocket_router import router as websocket_router
 
 app = FastAPI()
 
@@ -31,3 +32,4 @@ app.include_router(iracing_router)
 app.include_router(events_router)
 app.include_router(race_plan_router)
 app.include_router(driver_roster_router)
+app.include_router(websocket_router)
